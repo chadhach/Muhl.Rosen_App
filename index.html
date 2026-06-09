@@ -98,7 +98,47 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;min-height:100vh
 .check-btn.ok.active{background:#2e7d32;color:white;}
 .check-btn.nok{border-color:#c62828;color:#c62828;}
 .check-btn.nok.active{background:#c62828;color:white;}
-
+.machine-selector-card {
+  background: #fff;
+  border: 0.5px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 12px;
+}
+.selector-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.machine-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.machine-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 18px; border-radius: 8px;
+  border: 1px solid #ccc; background: #f5f5f5;
+  color: #888; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.machine-btn.active { background: #e8f2fd; border-color: #4A90D9; color: #1a4f8a; }
+.machine-btn .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+.machine-btn.active .dot { background: #4A90D9; }
+.warn-banner {
+  background: #fff8e1; border: 1px solid #ffc107;
+  border-radius: 8px; padding: 10px 14px;
+  font-size: 13px; color: #7a5500; margin-bottom: 12px;
+}
+.warn-banner.hidden { display: none; }
+.pill-inactive {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  background: #f0f0f0;
+  color: #aaa;
+  border: 1px dashed #ccc;
+}
 /* PASSATION */
 .passation-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .passation-col{background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);}
@@ -750,7 +790,7 @@ function validerHistoryPin() {
 }
 // ===== NIV0 CHECKLIST =====
 // ============================================================
-//  NIV0 CHECKLIST — QR SYSTEM CORRIGÉ
+//  NIV0 CHECKLIST 
 // ============================================================
 
 // ── 1. DÉFINITION DES TÂCHES ─────────────────────────────────
@@ -866,7 +906,20 @@ NIV0_TASKS.forEach((task, i) => {
 });
 
 // ── 3. ÉTAT DE LA CHECKLIST ──────────────────────────────────
+// ── SÉLECTION DES MACHINES ACTIVES ──────────────────────────
+let selectedMachines = new Set(["M1", "M2", "M3", "M4"]); // toutes par défaut
+const LS_KEY_MACHINES = "niv0_machines_v1";
 
+function sauvegarderMachines() {
+  try { localStorage.setItem(LS_KEY_MACHINES, JSON.stringify([...selectedMachines])); } catch(e) {}
+}
+
+function restaurerMachines() {
+  try {
+    const raw = localStorage.getItem(LS_KEY_MACHINES);
+    if (raw) selectedMachines = new Set(JSON.parse(raw));
+  } catch(e) {}
+}
 function initChecklistState() {
   return NIV0_TASKS.map(task => {
     if (task.type === "simple") {
@@ -886,7 +939,6 @@ let checklistState = initChecklistState();
 
 // ── 4. CONSTRUCTION DE L'AFFICHAGE ──────────────────────────
 // CORRECTION : data-tache-idx retiré des champs header, placé sur chaque item
-
 function buildNiv0Checklist() {
   const today = new Date().toISOString().split('T')[0];
   const wi = getCurrentWeekInfo();
@@ -899,22 +951,39 @@ function buildNiv0Checklist() {
       <div class="field-group"><label>Shift</label><select id="f-shift"><option>Matin</option><option>Après-midi</option><option>Nuit</option></select></div>
       <div class="field-group" style="grid-column:1/-1"><label>Opérateur</label><input type="text" id="f-op" value="${currentUserNom} (${currentUser})"></div>
     </div>
+  </div>`;
+
+  html += `
+  <div class="machine-selector-card">
+    <div class="selector-label">Machines à inspecter ce shift</div>
+    <div class="machine-btns" id="machineBtns">
+      ${["M1","M2","M3","M4"].map(m => `
+        <button class="machine-btn ${selectedMachines.has(m) ? 'active' : ''}"
+                data-m="${m}" onclick="toggleMachine(this)">
+          <span class="dot"></span> ${m}
+        </button>`).join("")}
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:#888;" id="selectionInfo"></div>
   </div>
-  <div class="section-title">CRITÈRES DE CONTRÔLE PROCESSUS</div>`;
+  <div class="warn-banner hidden" id="warnBanner">
+    ⚠️ Aucune machine sélectionnée. Sélectionnez au moins une machine pour activer les scans.
+  </div>`;
+
+  html += `<div class="section-title">CRITÈRES DE CONTRÔLE PROCESSUS</div>`;
 
   NIV0_TASKS.forEach((task, i) => {
     const imgSrc = task.img && niv0Images[task.img] ? niv0Images[task.img] : null;
 
-    // Zone QR selon le type de tâche
     let qrZone = "";
     if (task.type === "simple") {
       qrZone = `<div class="qr-zone"><span class="pill-attente">En attente de scan OK ou NOK</span></div>`;
     } else if (task.type === "machines") {
-      const pills = task.qrs.machines.map(m =>
-        `<span class="pill-attente">${m.label} · en attente</span>`
-      ).join("");
-      qrZone = `<div class="qr-zone">${pills}</div>`;
-    }
+  const pills = task.qrs.machines.map(m => {
+    const active = selectedMachines.has(m.id);
+    return `<span class="${active ? 'pill-attente' : 'pill-inactive'}">${m.label} · ${active ? 'en attente' : 'désactivé'}</span>`;
+  }).join("");
+  qrZone = `<div class="qr-zone">${pills}</div>`;
+}
 
     html += `<div class="checklist-item" data-tache-idx="${i}">
       ${imgSrc
@@ -937,12 +1006,40 @@ function buildNiv0Checklist() {
 
   document.getElementById('niv0-content').innerHTML = html;
 
-  // Restaurer l'état sauvegardé après avoir construit le DOM
+  restaurerMachines();
   restaurerState();
-  // Rafraîchir l'affichage de toutes les tâches
+  NIV0_TASKS.forEach((_, i) => mettreAJourAffichageTache(i));
+  mettreAJourInfoSelection();
+}
+function toggleMachine(btn) {
+  const m = btn.dataset.m;
+  if (selectedMachines.has(m)) {
+    selectedMachines.delete(m);
+    btn.classList.remove("active");
+  } else {
+    selectedMachines.add(m);
+    btn.classList.add("active");
+  }
+  sauvegarderMachines();
+  mettreAJourInfoSelection();
+  // Rafraîchir l'affichage de toutes les pills
   NIV0_TASKS.forEach((_, i) => mettreAJourAffichageTache(i));
 }
 
+function mettreAJourInfoSelection() {
+  const count = selectedMachines.size;
+  const warn = document.getElementById("warnBanner");
+  const info = document.getElementById("selectionInfo");
+  if (!info) return;
+  if (count === 0) {
+    warn && warn.classList.remove("hidden");
+    info.textContent = "Aucune machine sélectionnée";
+  } else {
+    warn && warn.classList.add("hidden");
+    const list = [...selectedMachines].sort().join(", ");
+    info.textContent = count + " machine(s) · QR actifs : " + list;
+  }
+}
 // ── 5. SCANNER USB ───────────────────────────────────────────
 
 let _qrBuffer = "";
@@ -992,6 +1089,7 @@ function traiterScan(code) {
   const heure = new Date().toLocaleTimeString("fr-FR");
 
   if (info.type === "simple") {
+    
     if (etat.statut !== null) {
       afficherToast("Tâche " + info.tacheId + " déjà validée (" + etat.statut.toUpperCase() + ")", "warning");
       jouerSon("warning");
@@ -1004,7 +1102,12 @@ function traiterScan(code) {
     jouerSon(info.resultat);
   }
 
-  else if (info.type === "machine") {
+else if (info.type === "machine") {
+  if (!selectedMachines.has(info.machineId)) {
+    afficherToast("Machine " + info.machineId + " non sélectionnée pour ce shift", "warning");
+    jouerSon("warning");
+    return;
+  }
     const mid  = info.machineId;
     const slot = etat.machines[mid];
 
@@ -1101,10 +1204,9 @@ function reinitialiserState() {
 }
 
 // ── 9. EXPORT EXCEL ──────────────────────────────────────────
-
 function exporterExcel() {
   if (typeof XLSX === "undefined") {
-    alert("SheetJS non chargé. Ajoutez la balise SCRIPT SheetJS dans votre HTML.");
+    alert("SheetJS non chargé.");
     return;
   }
   const date  = document.getElementById("f-date")  ? document.getElementById("f-date").value  : "—";
@@ -1114,32 +1216,40 @@ function exporterExcel() {
 
   NIV0_TASKS.forEach((task, i) => {
     const etat = checklistState[i];
+
     if (task.type === "simple") {
       lignes.push({
         "N°": task.id, "Type": "Simple", "Tâche": task.text, "Machine": "—",
         "Statut": (etat.statut || "non scanné").toUpperCase(),
         "QR scanné": etat.qrCode || "—", "Heure scan": etat.timestamp || "—",
-        "Observation": etat.observation, "Date": date, "Shift": shift, "Opérateur": op
+        "Observation": etat.observation || "", "Date": date, "Shift": shift, "Opérateur": op
       });
+
     } else if (task.type === "machines") {
-      task.qrs.machines.forEach(m => {
-        const slot = etat.machines[m.id];
-        lignes.push({
-          "N°": task.id, "Type": "Machine", "Tâche": task.text, "Machine": m.label,
-          "Statut": (slot.statut || "non scanné").toUpperCase(),
-          "QR scanné": slot.qrCode || "—", "Heure scan": slot.timestamp || "—",
-          "Observation": etat.observation, "Date": date, "Shift": shift, "Opérateur": op
+      // ↓ Seulement les machines sélectionnées
+      task.qrs.machines
+        .filter(m => selectedMachines.has(m.id))
+        .forEach(m => {
+          const slot = etat.machines[m.id];
+          lignes.push({
+            "N°": task.id, "Type": "Machine", "Tâche": task.text,
+            "Machine": m.id,          // ← ID court : M1, M2...
+            "Machine (libellé)": m.label, // ← libellé complet
+            "Statut": (slot.statut || "non scanné").toUpperCase(),
+            "QR scanné": slot.qrCode || "—", "Heure scan": slot.timestamp || "—",
+            "Observation": etat.observation || "", "Date": date, "Shift": shift, "Opérateur": op
+          });
         });
-      });
     }
   });
 
   const ws = XLSX.utils.json_to_sheet(lignes);
-  ws["!cols"] = [4, 8, 52, 22, 12, 16, 10, 28, 12, 12, 22].map(w => ({ wch: w }));
+  ws["!cols"] = [4, 8, 52, 6, 22, 12, 16, 10, 28, 12, 12, 22].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "NIV0");
   XLSX.writeFile(wb, "NIV0_" + date + "_" + shift.replace(/[^a-zA-Z0-9]/g, "") + ".xlsx");
 }
+ 
 
 // ── 10. FEEDBACK SONORE ──────────────────────────────────────
 
@@ -1186,14 +1296,22 @@ function afficherToast(msg, type) {
 }
 
 // ── 12. MISE À JOUR AFFICHAGE D'UNE TÂCHE ───────────────────
-
 function mettreAJourAffichageTache(idx) {
   const item = document.querySelector('[data-tache-idx="' + idx + '"]');
   if (!item) return;
   const etat   = checklistState[idx];
   const task   = NIV0_TASKS[idx];
-  const statut = getStatutTache(idx);
 
+  // Recalculer statutGlobal uniquement sur les machines sélectionnées
+  if (task.type === "machines") {
+    const machinesActives = task.qrs.machines.filter(m => selectedMachines.has(m.id));
+    const toutesScannees  = machinesActives.length > 0 && machinesActives.every(m => etat.machines[m.id].statut !== null);
+    etat.statutGlobal = toutesScannees
+      ? (machinesActives.some(m => etat.machines[m.id].statut === "nok") ? "nok" : "ok")
+      : null;
+  }
+
+  const statut = getStatutTache(idx);
   item.classList.remove("ok", "nok", "en-cours");
   if (statut === "ok")  item.classList.add("ok");
   if (statut === "nok") item.classList.add("nok");
@@ -1205,8 +1323,16 @@ function mettreAJourAffichageTache(idx) {
     zoneQr.innerHTML = etat.statut
       ? '<span class="pill-' + etat.statut + '">' + etat.statut.toUpperCase() + ' · ' + etat.timestamp + '</span>'
       : '<span class="pill-attente">En attente de scan OK ou NOK</span>';
+
   } else if (task.type === "machines") {
     zoneQr.innerHTML = task.qrs.machines.map(function(m) {
+      const active = selectedMachines.has(m.id);
+
+      // Machine non sélectionnée → pill grise
+      if (!active) {
+        return '<span class="pill-inactive">' + m.label + ' · désactivé</span>';
+      }
+
       const slot = etat.machines[m.id];
       return slot.statut
         ? '<span class="pill-' + slot.statut + '">' + m.label + ' · ' + slot.statut.toUpperCase() + ' · ' + slot.timestamp + '</span>'
@@ -1230,72 +1356,98 @@ function toggleCheck(btn, type) {
   }
 }  
  function enregistrerNiv0() {
-  // Vérifier que toutes les tâches ont été scannées
-  for (let i = 0; i < NIV0_TASKS.length; i++) {
-    if (!isTacheComplete(i)) {
-      const item = document.querySelector('[data-tache-idx="' + i + '"]');
-      alert("⚠️ Tâche " + (i + 1) + " non complétée — scannez le QR code correspondant !");
-      if (item) {
-        item.style.background = '#fee2e2';
-        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      return;
-    }
-  }
+  // ── Vérifier que toutes les machines sélectionnées sont scannées ──
+  const enAttente = [];
 
-  const date  = document.getElementById('f-date')?.value  || new Date().toISOString().split('T')[0];
-  const shift = document.getElementById('f-shift')?.value || '';
-  const op    = document.getElementById('f-op')?.value    || '';
-
-  // ✅ Même structure que exporterExcel()
-  const checks = [];
   NIV0_TASKS.forEach((task, i) => {
     const etat = checklistState[i];
-    if (task.type === 'simple') {
-      checks.push({
-        id: task.id, type: 'Simple', label: task.text, machine: '—',
-        ok: (etat.statut || '') === 'ok',
-        nok: (etat.statut || '') === 'nok',
-        qr: etat.qrCode || '—',
-        heureQr: etat.timestamp || '—',
-        obs: etat.observation || ''
-      });
-    } else if (task.type === 'machines') {
-      task.qrs.machines.forEach(m => {
-        const slot = etat.machines[m.id];
-        checks.push({
-          id: task.id, type: 'Machine', label: task.text, machine: m.label,
-          ok: (slot.statut || '') === 'ok',
-          nok: (slot.statut || '') === 'nok',
-          qr: slot.qrCode || '—',
-          heureQr: slot.timestamp || '—',
-          obs: etat.observation || ''
+
+    if (task.type === "simple") {
+      if (etat.statut === null) {
+        enAttente.push("Tâche " + task.id + " : " + task.text.substring(0, 40) + "…");
+      }
+    } else if (task.type === "machines") {
+      task.qrs.machines
+        .filter(m => selectedMachines.has(m.id))   // uniquement machines actives
+        .forEach(m => {
+          if (etat.machines[m.id].statut === null) {
+            enAttente.push("Tâche " + task.id + " · " + m.id + " : " + m.label);
+          }
         });
+    }
+  });
+
+  if (enAttente.length > 0) {
+    alert("⚠️ Enregistrement impossible — " + enAttente.length + " scan(s) manquant(s) :\n\n" + enAttente.slice(0, 10).join("\n") + (enAttente.length > 10 ? "\n…" : ""));
+    return;
+  }
+
+  // ── Construire le payload au même format ──
+  const checks = [];
+
+  NIV0_TASKS.forEach((task, i) => {
+    const etat = checklistState[i];
+
+    if (task.type === "simple") {
+      checks.push({
+        id:           task.id,
+        type:         "Simple",
+        label:        task.text,
+        machine:      "—",
+        machineLabel: "—",
+        statut:       (etat.statut || "non scanné").toUpperCase(),
+        qr:           etat.qrCode    || "—",
+        heureQr:      etat.timestamp || "—",
+        obs:          etat.observation || ""
       });
+
+    } else if (task.type === "machines") {
+      task.qrs.machines
+        .filter(m => selectedMachines.has(m.id))   // uniquement machines actives
+        .forEach(m => {
+          const slot = etat.machines[m.id];
+          checks.push({
+            id:           task.id,
+            type:         "Machine",
+            label:        task.text,
+            machine:      m.id,       // M1, M2…
+            machineLabel: m.label,    // libellé complet
+            statut:       (slot.statut || "non scanné").toUpperCase(),
+            qr:           slot.qrCode    || "—",
+            heureQr:      slot.timestamp || "—",
+            obs:          etat.observation || ""
+          });
+        });
     }
   });
 
   const payload = {
-    date: date,
-    shift: shift,
-    operateur: op,
-    heure: new Date().toLocaleString('fr-FR'),
-    checks: checks
+    date:      document.getElementById("f-date").value,
+    shift:     document.getElementById("f-shift").value,
+    operateur: document.getElementById("f-op").value,
+    heure:     new Date().toLocaleTimeString("fr-FR"),
+    checks
   };
 
-  if (!allData[currentWeekKey + '_niv0']) allData[currentWeekKey + '_niv0'] = [];
-  allData[currentWeekKey + '_niv0'].push(payload);
-  saveData();
-  saveHistory('niv0', currentWeekKey, allData[currentWeekKey + '_niv0']);
-
- envoyerVersSheets('niv0', payload);
-exporterExcel();
-
-  renderWeeksList();
-  showToast('Checklist Niv0 enregistrée et exportée ✓');
-  sauvegarderState();
+  // ── Envoyer au Google Apps Script ──
+  fetch(APPS_SCRIPT_URL, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ type: "niv0", payload })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.ok) {
+      afficherToast("✅ Checklist enregistrée avec succès", "ok");
+      jouerSon("ok");
+    } else {
+      afficherToast("❌ Erreur : " + res.error, "erreur");
+    }
+  })
+  .catch(err => {
+    afficherToast("❌ Erreur réseau : " + err.message, "erreur");
+  });
 }
-
 // ── 14. INIT PRINCIPALE ──────────────────────────────────────
 
 function initQRSystem() {
