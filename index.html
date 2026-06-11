@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MUHLBAUER CT 12/88 L — Production</title>
-<script src="xlsx.full.min.js"></script>  
-<script src="qr-system.js"></script>
+<script src="./xlsx.full.min.js"></script>  
+<script src="./qr-system.js"></script>
 <style>
   
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -945,7 +945,7 @@ function buildNiv0Checklist() {
 
   let html = `<div class="checklist-header">
     <h3>📋 CHECKLIST PRÉ-DÉMARRAGE · MUHLBAUER CT 12/88 L</h3>
-    <p style="font-size:11px;color:#999;margin-bottom:10px;">À remplir avant chaque shift · ${wi.label} ${wi.year}</p>
+    <p style="font-size:11px;color:#999;margin-bottom:10px;">À remplir avant chaque démarrage machine · ${wi.label} ${wi.year}</p>
     <div class="header-fields">
       <div class="field-group"><label>Date</label><input type="date" id="f-date" value="${today}"></div>
       <div class="field-group"><label>Shift</label><select id="f-shift"><option>Matin</option><option>Après-midi</option><option>Nuit</option></select></div>
@@ -955,7 +955,7 @@ function buildNiv0Checklist() {
 
   html += `
   <div class="machine-selector-card">
-    <div class="selector-label">Machines à inspecter ce shift</div>
+    <div class="selector-label">Machines à inspecter </div>
     <div class="machine-btns" id="machineBtns">
       ${["M1","M2","M3","M4"].map(m => `
         <button class="machine-btn ${selectedMachines.has(m) ? 'active' : ''}"
