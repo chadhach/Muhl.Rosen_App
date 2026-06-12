@@ -1356,36 +1356,6 @@ function toggleCheck(btn, type) {
   }
 }  
 function enregistrerNiv0() {
-  const enAttente = [];
-
-  NIV0_TASKS.forEach((task, i) => {
-    const etat = checklistState[i];
-    if (!etat) return;
-
-    if (task.type === "simple") {
-      // ← accepte null ET undefined ET ""
-      if (!etat.statut) {
-        enAttente.push("Tâche " + task.id + " : " + task.text.substring(0, 40) + "…");
-      }
-    } else if (task.type === "machines") {
-      // ← seulement si des machines sont sélectionnées
-      if (selectedMachines.size > 0) {
-        task.qrs.machines
-          .filter(m => selectedMachines.has(m.id))
-          .forEach(m => {
-            if (!etat.machines?.[m.id]?.statut) {
-              enAttente.push("Tâche " + task.id + " · " + m.id + " : " + m.label);
-            }
-          });
-      }
-    }
-  });
-
-  if (enAttente.length > 0) {
-    alert("⚠️ Enregistrement impossible — " + enAttente.length + " scan(s) manquant(s) :\n\n" + 
-    enAttente.slice(0, 10).join("\n") + (enAttente.length > 10 ? "\n…" : ""));
-    return;
-  }
 
   // ── Construire le payload ──
   const checks = [];
