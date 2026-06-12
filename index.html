@@ -1356,11 +1356,15 @@ function toggleCheck(btn, type) {
   }
 }  
  function enregistrerNiv0() {
-  // ── Vérifier que toutes les machines sélectionnées sont scannées ──
+  console.log("=== DEBUT ENREGISTREMENT ===");
+  console.log("checklistState:", checklistState);
+  console.log("selectedMachines:", [...selectedMachines]);
+  
   const enAttente = [];
 
   NIV0_TASKS.forEach((task, i) => {
     const etat = checklistState[i];
+    console.log(`Task ${i} (${task.type}):`, etat);
 
     if (task.type === "simple") {
       if (etat.statut === null) {
@@ -1368,8 +1372,9 @@ function toggleCheck(btn, type) {
       }
     } else if (task.type === "machines") {
       task.qrs.machines
-        .filter(m => selectedMachines.has(m.id))   // uniquement machines actives
+        .filter(m => selectedMachines.has(m.id))
         .forEach(m => {
+          console.log(`Machine ${m.id}:`, etat.machines[m.id]);
           if (etat.machines[m.id].statut === null) {
             enAttente.push("Tâche " + task.id + " · " + m.id + " : " + m.label);
           }
@@ -1377,58 +1382,7 @@ function toggleCheck(btn, type) {
     }
   });
 
-  if (enAttente.length > 0) {
-    alert("⚠️ Enregistrement impossible — " + enAttente.length + " scan(s) manquant(s) :\n\n" + enAttente.slice(0, 10).join("\n") + (enAttente.length > 10 ? "\n…" : ""));
-    return;
-  }
-
-  // ── Construire le payload au même format ──
-  const checks = [];
-
-  NIV0_TASKS.forEach((task, i) => {
-    const etat = checklistState[i];
-
-    if (task.type === "simple") {
-      checks.push({
-        id:           task.id,
-        type:         "Simple",
-        label:        task.text,
-        machine:      "—",
-        machineLabel: "—",
-        statut:       (etat.statut || "non scanné").toUpperCase(),
-        qr:           etat.qrCode    || "—",
-        heureQr:      etat.timestamp || "—",
-        obs:          etat.observation || ""
-      });
-
-    } else if (task.type === "machines") {
-      task.qrs.machines
-        .filter(m => selectedMachines.has(m.id))   // uniquement machines actives
-        .forEach(m => {
-          const slot = etat.machines[m.id];
-          checks.push({
-            id:           task.id,
-            type:         "Machine",
-            label:        task.text,
-            machine:      m.id,       // M1, M2…
-            machineLabel: m.label,    // libellé complet
-            statut:       (slot.statut || "non scanné").toUpperCase(),
-            qr:           slot.qrCode    || "—",
-            heureQr:      slot.timestamp || "—",
-            obs:          etat.observation || ""
-          });
-        });
-    }
-  });
-
-  const payload = {
-    date:      document.getElementById("f-date").value,
-    shift:     document.getElementById("f-shift").value,
-    operateur: document.getElementById("f-op").value,
-    heure:     new Date().toLocaleTimeString("fr-FR"),
-    checks
-  };
-
+  console.log("En attente:", enAttente);
   // ── Envoyer au Google Apps Script ──
   fetch(APPS_SCRIPT_URL, {
     method:  "POST",
