@@ -1356,68 +1356,85 @@ function toggleCheck(btn, type) {
   }
 }  
 function enregistrerNiv0() {
+  try {
+    // ── Vérification des champs obligatoires ──
+    const dateEl = document.getElementById("f-date");
+    const shiftEl = document.getElementById("f-shift");
+    const opEl = document.getElementById("f-op");
 
-  // ── Construire le payload ──
-  const checks = [];
-
-  NIV0_TASKS.forEach((task, i) => {
-    const etat = checklistState[i];
-    if (!etat) return;
-
-    if (task.type === "simple") {
-      checks.push({
-        id:           task.id,
-        type:         "Simple",
-        label:        task.text,
-        machine:      "—",
-        machineLabel: "—",
-        statut:       (etat.statut || "non scanné").toUpperCase(),
-        qr:           etat.qrCode    || "—",
-        heureQr:      etat.timestamp || "—",
-        obs:          etat.observation || ""
-      });
-    } else if (task.type === "machines" && selectedMachines.size > 0) {
-      task.qrs.machines
-        .filter(m => selectedMachines.has(m.id))
-        .forEach(m => {
-          const slot = etat.machines?.[m.id];
-          checks.push({
-            id:           task.id,
-            type:         "Machine",
-            label:        task.text,
-            machine:      m.id,
-            machineLabel: m.label,
-            statut:       (slot?.statut || "non scanné").toUpperCase(),
-            qr:           slot?.qrCode    || "—",
-            heureQr:      slot?.timestamp || "—",
-            obs:          etat.observation || ""
-          });
-        });
+    if (!dateEl || !shiftEl || !opEl) {
+      afficherToast("❌ Champs introuvables dans le DOM", "erreur");
+      console.error("IDs manquants :", { dateEl, shiftEl, opEl });
+      return;
     }
-  });
 
-  const payload = {
-    date:      document.getElementById("f-date").value,
-    shift:     document.getElementById("f-shift").value,
-    operateur: document.getElementById("f-op").value,
-    heure:     new Date().toLocaleTimeString("fr-FR"),
-    checks
-  };
+    // ── Construire le payload ──
+    const checks = [];
 
-  // ── Envoyer au Google Apps Script ──
-  fetch(APPS_SCRIPT_URL, {
-    method:  "POST",
-    mode:    "no-cors",
-    headers: { "Content-Type": "text/plain" },
-    body:    JSON.stringify({ type: "niv0", payload })
-  })
-  .then(() => {
-    afficherToast("✅ Checklist enregistrée avec succès", "ok");
-    jouerSon("ok");
-  })
-  .catch(err => {
-    afficherToast("❌ Erreur réseau : " + err.message, "erreur");
-  });
+    NIV0_TASKS.forEach((task, i) => {
+      const etat = checklistState[i];
+      if (!etat) return;
+
+      if (task.type === "simple") {
+        checks.push({
+          id:           task.id,
+          type:         "Simple",
+          label:        task.text,
+          machine:      "—",
+          machineLabel: "—",
+          statut:       (etat.statut || "non scanné").toUpperCase(),
+          qr:           etat.qrCode    || "—",
+          heureQr:      etat.timestamp || "—",
+          obs:          etat.observation || ""
+        });
+      } else if (task.type === "machines" && selectedMachines.size > 0) {
+        task.qrs.machines
+          .filter(m => selectedMachines.has(m.id))
+          .forEach(m => {
+            const slot = etat.machines?.[m.id];
+            checks.push({
+              id:           task.id,
+              type:         "Machine",
+              label:        task.text,
+              machine:      m.id,
+              machineLabel: m.label,
+              statut:       (slot?.statut || "non scanné").toUpperCase(),
+              qr:           slot?.qrCode    || "—",
+              heureQr:      slot?.timestamp || "—",
+              obs:          etat.observation || ""
+            });
+          });
+      }
+    });
+
+    const payload = {
+      date:      dateEl.value,
+      shift:     shiftEl.value,
+      operateur: opEl.value,
+      heure:     new Date().toLocaleTimeString("fr-FR"),
+      checks
+    };
+
+    // ── Envoyer au Google Apps Script ──
+    fetch(APPS_SCRIPT_URL, {
+      method:  "POST",
+      mode:    "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body:    JSON.stringify({ type: "niv0", payload })
+    })
+    .then(() => {
+      afficherToast("✅ Checklist enregistrée avec succès", "ok");
+      // ── Vérifie que jouerSon existe avant d'appeler ──
+      if (typeof jouerSon === "function") jouerSon("ok");
+    })
+    .catch(err => {
+      afficherToast("❌ Erreur réseau : " + err.message, "erreur");
+    });
+
+  } catch (err) {
+    console.error("❌ Erreur dans enregistrerNiv0 :", err);
+    afficherToast("❌ Erreur : " + err.message, "erreur");
+  }
 }
 // ── 14. INIT PRINCIPALE ──────────────────────────────────────
 
