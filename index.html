@@ -1430,25 +1430,20 @@ function toggleCheck(btn, type) {
   };
 
   // ── Envoyer au Google Apps Script ──
-  fetch(APPS_SCRIPT_URL, {
+ fetch(APPS_SCRIPT_URL, {
     method:  "POST",
-    mode:   "no-cors",    
-    headers: { "Content-Type": "application/json" },
+    mode:    "no-cors",    
+    headers: { "Content-Type": "text/plain" },  // ← text/plain obligatoire avec no-cors
     body:    JSON.stringify({ type: "niv0", payload })
-  })
-  .then(r => r.json())
-  .then(res => {
-    if (res.ok) {
-      afficherToast("✅ Checklist enregistrée avec succès", "ok");
-      jouerSon("ok");
-    } else {
-      afficherToast("❌ Erreur : " + res.error, "erreur");
-    }
-  })
-  .catch(err => {
+})
+.then(() => {
+    // ← no-cors = réponse opaque, on ne peut pas lire res.ok
+    afficherToast("✅ Checklist enregistrée avec succès", "ok");
+    jouerSon("ok");
+})
+.catch(err => {
     afficherToast("❌ Erreur réseau : " + err.message, "erreur");
-  });
-}
+});}
 // ── 14. INIT PRINCIPALE ──────────────────────────────────────
 
 function initQRSystem() {
