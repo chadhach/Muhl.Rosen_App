@@ -1355,38 +1355,44 @@ function toggleCheck(btn, type) {
     okBtn.classList.remove('active');
   }
 }  
- function enregistrerNiv0() {
-  // ── Vérifier que toutes les machines sélectionnées sont scannées ──
+function enregistrerNiv0() {
   const enAttente = [];
 
   NIV0_TASKS.forEach((task, i) => {
     const etat = checklistState[i];
+    if (!etat) return;
 
     if (task.type === "simple") {
-      if (etat.statut === null) {
+      // ← accepte null ET undefined ET ""
+      if (!etat.statut) {
         enAttente.push("Tâche " + task.id + " : " + task.text.substring(0, 40) + "…");
       }
     } else if (task.type === "machines") {
-      task.qrs.machines
-        .filter(m => selectedMachines.has(m.id))   // uniquement machines actives
-        .forEach(m => {
-          if (!etat.machines[m.id].statut ) {
-            enAttente.push("Tâche " + task.id + " · " + m.id + " : " + m.label);
-          }
-        });
+      // ← seulement si des machines sont sélectionnées
+      if (selectedMachines.size > 0) {
+        task.qrs.machines
+          .filter(m => selectedMachines.has(m.id))
+          .forEach(m => {
+            if (!etat.machines?.[m.id]?.statut) {
+              enAttente.push("Tâche " + task.id + " · " + m.id + " : " + m.label);
+            }
+          });
+      }
     }
   });
 
   if (enAttente.length > 0) {
-    alert("⚠️ Enregistrement impossible — " + enAttente.length + " scan(s) manquant(s) :\n\n" + enAttente.slice(0, 10).join("\n") + (enAttente.length > 10 ? "\n…" : ""));
+    alert("⚠️ Enregistrement impossible — " + enAttente.length + " scan(s) manquant(s) :\n\n" + 
+    enAttente.slice(0, 10).join("\n") + (enAttente.length > 10 ? "\n…" : ""));
     return;
   }
 
-  // ── Construire le payload au même format ──
+  // ── Construire le payload ──
   const checks = [];
 
   NIV0_TASKS.forEach((task, i) => {
     const etat = checklistState[i];
+    if (!etat) return;
 
     if (task.type === "simple") {
       checks.push({
@@ -1400,21 +1406,20 @@ function toggleCheck(btn, type) {
         heureQr:      etat.timestamp || "—",
         obs:          etat.observation || ""
       });
-
-    } else if (task.type === "machines") {
+    } else if (task.type === "machines" && selectedMachines.size > 0) {
       task.qrs.machines
-        .filter(m => selectedMachines.has(m.id))   // uniquement machines actives
+        .filter(m => selectedMachines.has(m.id))
         .forEach(m => {
-          const slot = etat.machines[m.id];
+          const slot = etat.machines?.[m.id];
           checks.push({
             id:           task.id,
             type:         "Machine",
             label:        task.text,
-            machine:      m.id,       // M1, M2…
-            machineLabel: m.label,    // libellé complet
-            statut:       (slot.statut || "non scanné").toUpperCase(),
-            qr:           slot.qrCode    || "—",
-            heureQr:      slot.timestamp || "—",
+            machine:      m.id,
+            machineLabel: m.label,
+            statut:       (slot?.statut || "non scanné").toUpperCase(),
+            qr:           slot?.qrCode    || "—",
+            heureQr:      slot?.timestamp || "—",
             obs:          etat.observation || ""
           });
         });
@@ -1430,20 +1435,20 @@ function toggleCheck(btn, type) {
   };
 
   // ── Envoyer au Google Apps Script ──
- fetch(APPS_SCRIPT_URL, {
+  fetch(APPS_SCRIPT_URL, {
     method:  "POST",
-    mode:    "no-cors",    
-    headers: { "Content-Type": "text/plain" },  // ← text/plain obligatoire avec no-cors
+    mode:    "no-cors",
+    headers: { "Content-Type": "text/plain" },
     body:    JSON.stringify({ type: "niv0", payload })
-})
-.then(() => {
-    // ← no-cors = réponse opaque, on ne peut pas lire res.ok
+  })
+  .then(() => {
     afficherToast("✅ Checklist enregistrée avec succès", "ok");
     jouerSon("ok");
-})
-.catch(err => {
+  })
+  .catch(err => {
     afficherToast("❌ Erreur réseau : " + err.message, "erreur");
-});}
+  });
+}
 // ── 14. INIT PRINCIPALE ──────────────────────────────────────
 
 function initQRSystem() {
