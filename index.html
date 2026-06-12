@@ -1424,8 +1424,7 @@ function enregistrerNiv0() {
     })
     .then(() => {
       afficherToast("✅ Checklist enregistrée avec succès", "ok");
-      // ── Vérifie que jouerSon existe avant d'appeler ──
-      if (typeof jouerSon === "function") jouerSon("ok");
+   
     })
     .catch(err => {
       afficherToast("❌ Erreur réseau : " + err.message, "erreur");
